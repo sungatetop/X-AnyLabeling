@@ -96,15 +96,18 @@ class RTMDet_Pose(Model):
                 shapes.append(rectangle_shape)
 
             img = image[y1:y2, x1:x2]
-            if not self.pose:
+            try:
+                keypoints, scores = self.pose(img)
+            except:
+                keypoints, scores = [], []
+            if not self.pose and len(keypoints) == 0:
                 continue
-            keypoints, scores = self.pose(img)
             for j in range(len(keypoints[0])):
                 kpt_point, score = keypoints[0][j], scores[0][j]
                 if score < self.kpt_thr:
                     continue
                 point_shape = Shape(
-                    label=self.kpt_classes[j],
+                    label=str(self.kpt_classes[j]),
                     shape_type="point",
                     group_id=int(i),
                 )

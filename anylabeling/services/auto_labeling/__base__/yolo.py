@@ -53,12 +53,26 @@ class YOLO(Model):
                     f"Could not download or initialize {self.config['type']} model.",
                 )
             )
-        self.net = OnnxBaseModel(model_abs_path, __preferred_device__)
-        _, _, self.input_height, self.input_width = self.net.get_input_shape()
-        if not isinstance(self.input_width, int):
-            self.input_width = self.config.get("input_width", -1)
-        if not isinstance(self.input_height, int):
-            self.input_height = self.config.get("input_height", -1)
+
+        self.engine = self.config.get("engine", "ort")
+        if self.engine.lower() == "dnn":
+            from ..engines import DnnBaseModel
+
+            self.net = DnnBaseModel(model_abs_path, __preferred_device__)
+            self.input_width = self.config.get("input_width", 640)
+            self.input_height = self.config.get("input_height", 640)
+        else:
+            self.net = OnnxBaseModel(model_abs_path, __preferred_device__)
+            (
+                _,
+                _,
+                self.input_height,
+                self.input_width,
+            ) = self.net.get_input_shape()
+            if not isinstance(self.input_width, int):
+                self.input_width = self.config.get("input_width", -1)
+            if not isinstance(self.input_height, int):
+                self.input_height = self.config.get("input_height", -1)
 
         self.model_type = self.config["type"]
         self.classes = self.config.get("classes", [])
@@ -113,6 +127,7 @@ class YOLO(Model):
             "yolov6",
             "yolov7",
             "yolov8",
+            "yolov9",
             "gold_yolo",
         ]:
             self.task = "det"
@@ -127,6 +142,15 @@ class YOLO(Model):
             "yolov8_obb",
         ]:
             self.task = "obb"
+
+    def inference(self, blob):
+        if self.engine == "dnn" and self.task in ["det", "seg", "track"]:
+            outputs = self.net.get_dnn_inference(blob=blob, extract=False)
+            if self.task == "det" and not isinstance(outputs, (tuple, list)):
+                outputs = [outputs]
+        else:
+            outputs = self.net.get_ort_inference(blob=blob, extract=False)
+        return outputs
 
     def preprocess(self, image, upsample_mode="letterbox"):
         self.img_height, self.img_width = image.shape[:2]
@@ -186,6 +210,7 @@ class YOLO(Model):
             "yolov8_seg",
             "yolov8_track",
             "yolov8_obb",
+            "yolov9",
         ]:
             p = non_max_suppression_v8(
                 preds[0],
@@ -205,6 +230,8 @@ class YOLO(Model):
             self.mask_height, self.mask_width = proto.shape[2:]
         for i, pred in enumerate(p):
             if self.task == "seg":
+                if np.size(pred) == 0:
+                    continue
                 masks = self.process_mask(
                     proto[i],
                     pred[:, 6:],
@@ -222,14 +249,16 @@ class YOLO(Model):
                 )
 
         if self.task == "obb":
+            pred = np.concatenate(
+                [pred[:, :4], pred[:, -1:], pred[:, 4:6]], axis=-1
+            )
             bbox = pred[:, :5]
-            clas = pred[:, 5:6]
-            conf = pred[:, 6:7]
+            conf = pred[:, -2]
+            clas = pred[:, -1]
         else:
             bbox = pred[:, :4]
             conf = pred[:, 4:5]
             clas = pred[:, 5:6]
-
         return (bbox, masks, clas, conf)
 
     def predict_shapes(self, image, image_path=None):
@@ -248,10 +277,10 @@ class YOLO(Model):
             return []
 
         blob = self.preprocess(image, upsample_mode="letterbox")
-        outputs = self.net.get_ort_inference(blob=blob, extract=False)
+        outputs = self.inference(blob)
         boxes, masks, class_ids, scores = self.postprocess(outputs)
         points = [[] for _ in range(len(boxes))]
-        if self.task == "seg":
+        if self.task == "seg" and masks is not None:
             points = [
                 scale_coords(self.input_shape, x, image.shape, normalize=False)
                 for x in masks2segments(masks, self.epsilon_factor)
@@ -282,7 +311,7 @@ class YOLO(Model):
                 shape.fill_color = "#000000"
                 shape.line_color = "#000000"
                 shape.line_width = 1
-                shape.label = self.classes[int(class_id)]
+                shape.label = str(self.classes[int(class_id)])
                 shape.selected = False
                 shapes.append(shape)
             if self.task == "seg":
@@ -310,7 +339,7 @@ class YOLO(Model):
                 shape.fill_color = "#000000"
                 shape.line_color = "#000000"
                 shape.line_width = 1
-                shape.label = self.classes[int(class_id)]
+                shape.label = str(self.classes[int(class_id)])
                 shape.selected = False
                 shapes.append(shape)
             if self.task == "obb":
@@ -331,7 +360,7 @@ class YOLO(Model):
                 shape.fill_color = "#000000"
                 shape.line_color = "#000000"
                 shape.line_width = 1
-                shape.label = self.classes[int(class_id)]
+                shape.label = str(self.classes[int(class_id)])
                 shape.selected = False
                 shapes.append(shape)
 
@@ -420,12 +449,22 @@ class YOLO(Model):
         downsampled_bboxes[:, 1] *= mh / ih
         masks = self.crop_mask_np(masks, downsampled_bboxes)  # CHW
         if upsample:
-            masks_np = np.transpose(masks, (1, 2, 0))
-            masks_resized = cv2.resize(
-                masks_np, (shape[1], shape[0]), interpolation=cv2.INTER_LINEAR
-            )
-            masks = np.transpose(masks_resized, (2, 0, 1))
-
+            if masks.shape[0] == 1:
+                masks_np = np.squeeze(masks, axis=0)
+                masks_resized = cv2.resize(
+                    masks_np,
+                    (shape[1], shape[0]),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                masks = np.expand_dims(masks_resized, axis=0)
+            else:
+                masks_np = np.transpose(masks, (1, 2, 0))
+                masks_resized = cv2.resize(
+                    masks_np,
+                    (shape[1], shape[0]),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                masks = np.transpose(masks_resized, (2, 0, 1))
         masks[masks > 0.5] = 1
         masks[masks <= 0.5] = 0
 

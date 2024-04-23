@@ -10,6 +10,7 @@ auto_use_last_label: false
 show_cross_line: true
 show_groups: true
 show_texts: true
+show_labels: true
 show_degrees: false
 show_shapes: true
 logger_level: info
@@ -90,6 +91,7 @@ shortcuts:
   save_as: Ctrl+Shift+S
   save_to: null
   delete_file: Ctrl+Delete
+  delete_image_file: Ctrl+Shift+Delete
 
   open_next: [D, Ctrl+Shift+D]
   open_prev: [A, Ctrl+Shift+A]
@@ -123,6 +125,8 @@ shortcuts:
   hide_selected_polygons: S
   show_hidden_polygons: W
   show_overview: Ctrl+G
+  show_texts: Ctrl+T
+  show_labels: Ctrl+L
   toggle_auto_use_last_label: Ctrl+Y
   toggle_visibility_shapes: Ctrl+H
 

@@ -103,6 +103,7 @@ class Canvas(
         self.show_cross_line = True
         self.show_shape_groups = True
         self.show_texts = True
+        self.show_labels = True
         self.show_shape_degrees = False
 
         self.is_loading = False
@@ -359,9 +360,12 @@ class Canvas(
         # Polygon/Vertex moving.
         if QtCore.Qt.LeftButton & ev.buttons():
             if self.selected_vertex():
-                self.bounded_move_vertex(pos)
-                self.repaint()
-                self.moving_shape = True
+                try:
+                    self.bounded_move_vertex(pos)
+                    self.repaint()
+                    self.moving_shape = True
+                except IndexError:
+                    return
                 if self.h_hape.shape_type == "rectangle":
                     p1 = self.h_hape[0]
                     p2 = self.h_hape[2]
@@ -422,7 +426,7 @@ class Canvas(
                 self.setStatusTip(self.toolTip())
                 self.update()
                 break
-            if shape.contains_point(pos):
+            if len(shape.points) > 1 and shape.contains_point(pos):
                 if self.selected_vertex():
                     self.h_hape.highlight_clear()
                 self.prev_h_vertex = self.h_vertex
@@ -430,9 +434,16 @@ class Canvas(
                 self.prev_h_shape = self.h_hape = shape
                 self.prev_h_edge = self.h_edge
                 self.h_edge = None
-                self.setToolTip(
-                    self.tr("Click & drag to move shape '%s'") % shape.label
-                )
+                if shape.group_id and shape.shape_type == "rectangle":
+                    tooltip_text = "Click & drag to move shape '{label} {group_id}'".format(
+                        label=shape.label, group_id=shape.group_id
+                    )
+                    self.setToolTip(self.tr(tooltip_text))
+                else:
+                    self.setToolTip(
+                        self.tr("Click & drag to move shape '%s'")
+                        % shape.label
+                    )
                 self.setStatusTip(self.toolTip())
                 self.override_cursor(CURSOR_GRAB)
                 group_mode = int(ev.modifiers()) == QtCore.Qt.ControlModifier
@@ -557,6 +568,8 @@ class Canvas(
                 elif (
                     self.selected_vertex()
                     and int(ev.modifiers()) == QtCore.Qt.ShiftModifier
+                    and self.h_hape.shape_type
+                    not in ["rectangle", "rotation", "line"]
                 ):
                     # Delete point if: left-click + SHIFT on a point
                     self.remove_selected_point()
@@ -693,7 +706,11 @@ class Canvas(
 
         else:
             for shape in reversed(self.shapes):
-                if self.is_visible(shape) and shape.contains_point(point):
+                if (
+                    self.is_visible(shape)
+                    and len(shape.points) > 1
+                    and shape.contains_point(point)
+                ):
                     self.set_hiding()
                     if shape not in self.selected_shapes:
                         if multiple_selection_mode:
@@ -1004,10 +1021,17 @@ class Canvas(
                 max_y = 0
                 for shape in shapes:
                     rect = shape.bounding_rect()
-                    min_x = min(min_x, rect.x())
-                    min_y = min(min_y, rect.y())
-                    max_x = max(max_x, rect.x() + rect.width())
-                    max_y = max(max_y, rect.y() + rect.height())
+                    if shape.shape_type == "point":
+                        points = shape.points[0]
+                        min_x = min(min_x, points.x())
+                        min_y = min(min_y, points.y())
+                        max_x = max(max_x, points.x())
+                        max_y = max(max_y, points.y())
+                    else:
+                        min_x = min(min_x, rect.x())
+                        min_y = min(min_y, rect.y())
+                        max_x = max(max_x, rect.x() + rect.width())
+                        max_y = max(max_y, rect.y() + rect.height())
                     group_color = LABEL_COLORMAP[
                         int(group_id) % len(LABEL_COLORMAP)
                     ]
@@ -1157,6 +1181,55 @@ class Canvas(
         #                 bbox.y(),
         #                 description,
         #             )
+
+        # Draw labels
+        if self.show_labels:
+            p.setFont(
+                QtGui.QFont(
+                    "Arial", int(max(6.0, int(round(8.0 / Shape.scale))))
+                )
+            )
+            pen = QtGui.QPen(QtGui.QColor("#FFA500"), 8, Qt.SolidLine)
+            p.setPen(pen)
+            for shape in self.shapes:
+                label = shape.label
+                d = shape.point_size / shape.scale
+                if label:
+                    try:
+                        bbox = shape.bounding_rect()
+                    except IndexError:
+                        continue
+                    fm = QtGui.QFontMetrics(p.font())
+                    rect = fm.boundingRect(label)
+                    x = bbox.x()
+                    y = bbox.y()
+                    p.fillRect(
+                        int(x),
+                        int(y),
+                        int(rect.width()),
+                        int(rect.height()),
+                        shape.line_color,
+                    )
+            pen = QtGui.QPen(QtGui.QColor("#FFFFFF"), 8, Qt.SolidLine)
+            p.setPen(pen)
+            for shape in self.shapes:
+                d = 1.5  # default shape sacle
+                label = shape.label
+                if label:
+                    try:
+                        bbox = shape.bounding_rect()
+                    except IndexError:
+                        continue
+                    fm = QtGui.QFontMetrics(p.font())
+                    rect = fm.boundingRect(label)
+                    x = bbox.x()
+                    y = bbox.y() + rect.height()
+                    bbox = shape.bounding_rect()
+                    p.drawText(
+                        int(x),
+                        int(y - d),
+                        label,
+                    )
 
         # Draw mouse coordinates
         if self.show_cross_line:
@@ -1544,6 +1617,11 @@ class Canvas(
     def set_show_texts(self, enabled):
         """Set showing texts"""
         self.show_texts = enabled
+        self.update()
+
+    def set_show_labels(self, enabled):
+        """Set showing labels"""
+        self.show_labels = enabled
         self.update()
 
     def set_show_degrees(self, enabled):

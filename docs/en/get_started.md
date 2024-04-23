@@ -19,25 +19,49 @@ To ensure access to the latest features and stable performance, it is highly rec
      ```bash
      # upgrade pip to its latest version
      pip install -U pip
-
+     
      pip install -r requirements-dev.txt
+     # or pip install -r requirements-gpu-dev.txt
      ```
 
+   **Note**: if you want to use gpu, ensure that your local CUDA version is compatible with the onnxruntime-gpu version for smooth GPU-accelerated model inference. Refer to the [official documentation](https://onnxruntime.ai/docs/execution-providers/CUDA-ExecutionProvider.html) for details. Also, set the `__preferred_device__` field to GPU in the [app_info.py](../../anylabeling/app_info.py) configuration file.
+
+
 3. **Launch the Tool:**
-   Execute the following command in the `X-AnyLabeling` project directory:
-   ```bash
-   python anylabeling/app.py
-   ```
 
    > Set the environment variable:
    > - Linux/MacOS: `export PYTHONPATH=/path/to/X-AnyLabeling`
    > - Windows: `set PYTHONPATH=C:\path\to\X-AnyLabeling`
 
+   Execute the following command in the `X-AnyLabeling` project directory:
+   ```bash
+   python anylabeling/app.py
+   ```
+
+    Options parameters: 
+
+    * `filename`: image or label filename; if a directory path is passed in, the folder will be automatically loaded
+    * `--help`,`-h`: display help message and exit.
+    - `--reset-config`: Reset the Qt configuration, clearing all settings.
+    - `--logger-level`: Set the logging level, options include "debug", "info", "warning", "fatal", "error".
+    - `--output`, `-O`, `-o`: Specify the output file or directory. If it ends in `.json`, it is recognized as a file, otherwise it is recognized as a directory.
+    - `--config`: Specify a configuration file or a string providing configuration information in YAML format.
+      Defaults to `~/.anylabelingrc` (Linux)         `C:\Users\{user}\.anylabelingrc` (Windows).
+    - `--nodata`: Stops storing image data in JSON files.
+    - `--autosave`: Automatically saves annotation data.
+    - `--nosortlabels`: Stop sorting labels.
+    - `--flags`: Comma-separated list of flags or file containing flags.
+    - `--labelflags`: A YAML string containing label-specific flags or a file containing a JSON string.
+    - `--labels`: Comma-separated list of labels or file containing labels.
+    - `--validatelabel`: Label validation type.
+    - `--keep-prev`: Keep comments from previous frame.
+    - `--epsilon`: Find the epsilon of the nearest vertex on the canvas.
+
 #### Running in GUI Environment
 
 Running in the GUI environment is convenient but may have limitations compared to running from the source code. Consider the pros and cons based on your specific needs and preferences.
 
-Download Link: [Release](https://github.com/CVHub520/X-AnyLabeling/releases/tag/v2.3.0) | [Baidu Disk](https://pan.baidu.com/s/1wHp1a0buUrqJlqEr8ZjM2w?pwd=2t9s)
+Download Link: [Release](https://github.com/CVHub520/X-AnyLabeling/releases/tag/v2.3.5) | [Baidu Disk](https://pan.baidu.com/s/1n3vfXZpBUG9s12NZjMxhlw?pwd=odyi)
 
 Note:
 - For MacOS:

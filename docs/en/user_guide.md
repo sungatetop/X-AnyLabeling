@@ -83,6 +83,83 @@ label_colors:
 
 Now, you have successfully modified the color of the custom labels. The next time you use these labels during annotation, they will appear in the color you have set. Similarly, you can set some default configurations according to your needs, such as modifying the `labels` field for predefined labels or setting different shortcut keys for triggering settings based on your preferences.
 
+### Quick Tag Modification Feature
+
+This feature provides users with a convenient way to process annotation data and supports two core operations:
+
+- **Delete Category:** By checking the checkbox in the `Delete` column of the corresponding rows, you can mark all objects of that category for deletion.
+- **Replace Category:** Fill in the new category name in the `New Value` column to replace the labels of all objects under the current category with the new category.
+
+You can follow these steps:
+
+1. Click on the menu bar at the top, select `Tools`-> `Change Label` option.
+
+2. In the popped-up `Label Change Manager` dialog, perform the desired operations on the respective categories.
+
+3. After completing all modifications, click the `Confirm` button to confirm and submit the changes.
+
+### Quick Screenshot and Save Feature
+
+Implementation Guide:
+
+1. Prepare a custom class file, you can refer to the example [classes.txt](../../assets/classes.txt);
+
+2. Click on the `Tools` menu at the top and select the `Save Cropped Image` option. Choose the corresponding custom class file for upload. This action will generate a subimage folder `x-anylabeling-crops` in the current directory, where targets will be stored based on their respective class names.
+
+### Quick Tag Correction Feature
+
+This functionality is designed to swiftly address two common mislabeling scenarios during the calibration process:
+
+- Incorrectly labeled background as foreground
+- Errors in foreground labeling
+
+Follow the steps below for implementation:
+
+1. Prepare a custom class file, for a specific example, please refer to [classes.txt](../../assets/classes.txt).
+
+2. Click on the menu bar at the top, select `Tools` -> `Save Expanded Sub-image`, and upload the corresponding custom class file. This action will generate a subgraph folder `x-anylabeling-crops` in the current directory, storing targets according to the respective class names. The directory structure is as follows:
+
+```
+|- root
+  |- images
+    |- xxx.jpg
+    |- xxx.json
+    |- yyy.jpg
+    |- yyy.json
+    |- ...
+  |- x-anylabeling-crops
+    |- src
+      |- CLASS-A
+        |- xxx.jpg
+        |- xxx1.jpg
+        |- xxx2.jpg
+        |- ...
+      |- CLASS-B
+        |- yyy.jpg
+        |- ...
+      ...
+    |- dst
+      |- CLASS-A
+      |- CLASS-B
+      |- ...
+    |- meta_data.json
+```
+
+Field explanations:
+
+- src: Original cropped image files
+- dst: Cropped image files after correction
+- meta_data.json: Cropped information file
+
+2. Open the src directory and perform the following actions for each subfolder:
+
+- Remove all erroneously labeled background boxes.
+- Move all foreground boxes with category errors to the corresponding folder in the dst directory.
+
+3. Open the X-Anylabeling tool, select `Tool` -> `Update Label`, choose the `x-anylabeling-crops` folder, click upload, and reload the source images.
+
+> Note: This feature is applicable only to `rectangle` objects.
+
 ### Multi-Label Classification Task Annotation
 
 Follow these steps:
@@ -134,6 +211,36 @@ Follow these steps:
 - `Point (e)`: Remove a point you want to exclude from the object;
 - `+Rect`: Draw a rectangle containing the object. Segment Anything will automatically segment the object.
 
-4. `Clear (c)`: Clear all automatic segmentation marks.
+4. `Clear (b)`: Clear all automatic segmentation marks.
 
-5. Complete the object (f): After completing the current mark, press the shortcut key `f`, enter the label name, and save the current object
+5. Complete the object (f): After completing the current mark, press the shortcut key `f`, enter the label name, and save the current object.
+
+### Multi-Object Tracking
+
+Multi-object tracking (MOT) technology is employed to simultaneously identify and track multiple targets within video sequences, involving the association of targets across different frames. The X-AnyLabeling tool currently integrates various detection and tracking algorithms, including `ByteTrack` and `OCSort`, and supports the import and export of MOT format labels.
+
+#### Export Settings:
+
+1. Load a video file; for example, refer to [demo_video.mp4](../../assets/demo_video.mp4) for a sample file.
+2. Load a tracking model, such as [yolov5m_bytetrack](../../anylabeling/configs/auto_labeling/yolov5m_bytetrack.yaml) or [yolov8m_ocsort](../../anylabeling/configs/auto_labeling/yolov8m_ocsort.yaml).
+3. Click "Run (i)" verify correctness, and press the shortcut `Ctrl+M` to execute tracking for all frames.
+4. Prepare a custom class file; see [classes.txt](../../assets/classes.txt) for a specific example.
+5. Click on the menu bar -> Export -> Choose the custom class file -> Confirm. A *.csv file will be generated in the same directory as the current video file.
+
+#### Import Settings:
+
+1. Load a video file.
+2. Prepare a custom class file; refer to [classes.txt](../../assets/classes.txt) for an example.
+3. Click on the menu bar -> Upload -> Choose the custom class file -> Select *.csv label file -> Confirm. MOT labels will be imported.
+
+### Depth Estimation
+
+Currently, the X-AnyLabeling tool incorporates the [Depth-Anything](https://github.com/LiheYoung/Depth-Anything.git) model, allowing users to choose a model of the desired scale (Small/Base/Large) based on their specific needs.
+
+The implementation steps are as follows:
+
+1. Load the image/video file.
+2. Load the Depth-Anything model or any other optional depth estimation model.
+3. Click on the run button, verify for accuracy, and, if all is correct, press the shortcut key `Ctrl+M` to run the process on all images at once.
+
+The final results of the run are saved by default in the `depth` folder located in the same directory as the current image.

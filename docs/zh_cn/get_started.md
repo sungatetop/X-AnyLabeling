@@ -29,18 +29,38 @@ git clone https://github.com/CVHub520/X-AnyLabeling.git
 
 3. 启动工具
 
-在 `X-AnyLabeling` 工程目录下执行以下命令进行启动：
-
-```bash
-python anylabeling/app.py
-```
-
 > 设置当前工作环境变量可参考以下步骤：</br>
 > - Linux/MasOS
 >   - export PYTHONPATH=/path/to/X-AnyLabeling
 > - Windows
 >   - set PYTHONPATH=C:\path\to\X-AnyLabeling
 
+在 `X-AnyLabeling` 工程目录下执行以下命令进行启动：
+
+```bash
+python anylabeling/app.py
+```
+
+**可选参数:**
+
+* `filename`: 图像或标签文件名；如果传入目录路径，则会自动加载该文件夹
+
+* `--help`,`-h`: 显示帮助消息并退出
+
+- `--reset-config`: 重置 Qt 配置，清除所有设置。
+- `--logger-level`: 设置日志级别，可选值包括 "debug", "info", "warning", "fatal", "error"。
+- `--output`, `-O`, `-o`: 指定输出文件或目录。如果以 `.json` 结尾，则被识别为文件，否则被识别为目录。
+- `--config`: 指定配置文件或者以 YAML 格式提供配置信息的字符串
+  默认为 `~/.anylabelingrc`(Linux)      `C:\Users\{user}\.anylabelingrc`(Windows)。
+- `--nodata`: 停止将图像数据存储到 JSON 文件中。
+- `--autosave`: 自动保存标注数据。
+- `--nosortlabels`: 停止对标签进行排序。
+- `--flags`: 逗号分隔的标志列表或包含标志的文件。
+- `--labelflags`: 包含标签特定标志的 YAML 字符串或包含 JSON 字符串的文件。
+- `--labels`: 逗号分隔的标签列表或包含标签的文件。
+- `--validatelabel`: 标签验证类型。
+- `--keep-prev`: 保留前一帧的注释。
+- `--epsilon`: 在画布上找到最近顶点的 epsilon。
 
 ### GUI 环境运行
 
@@ -54,7 +74,7 @@ python anylabeling/app.py
 
 为了在选择运行方式时能够更好地权衡利弊，建议用户根据具体需求和偏好，灵活选择源码运行或GUI环境运行，以达到最佳的使用体验。
 
-下载链接：[Release](https://github.com/CVHub520/X-AnyLabeling/releases/tag/v2.3.0) | [百度网盘](https://pan.baidu.com/s/1wHp1a0buUrqJlqEr8ZjM2w?pwd=2t9s)
+下载链接：[Release](https://github.com/CVHub520/X-AnyLabeling/releases/tag/v5) | [百度网盘](https://pan.baidu.com/s/1n3vfXZpBUG9s12NZjMxhlw?pwd=odyi)
 
 
 ### 文件导入

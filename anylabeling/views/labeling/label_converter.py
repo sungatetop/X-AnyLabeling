@@ -3,13 +3,14 @@ import os.path as osp
 import cv2
 import csv
 import json
-import natsort
+import math
 import numpy as np
 import xml.dom.minidom as minidom
 import xml.etree.ElementTree as ET
 
 from PIL import Image
 from datetime import date
+from itertools import chain
 
 from anylabeling.app_info import __version__
 from anylabeling.views.labeling.logger import logger
@@ -34,6 +35,26 @@ class LabelConverter:
             imageHeight=-1,
             imageWidth=-1,
         )
+
+    @staticmethod
+    def calculate_rotation_theta(points):
+        x1, y1 = points[0]
+        x2, y2 = points[1]
+
+        # Calculate one of the diagonal vectors (after rotation)
+        diagonal_vector_x = x2 - x1
+        diagonal_vector_y = y2 - y1
+
+        # Calculate the rotation angle in radians
+        rotation_angle = math.atan2(diagonal_vector_y, diagonal_vector_x)
+
+        # Convert radians to degrees
+        rotation_angle_degrees = math.degrees(rotation_angle)
+
+        if rotation_angle_degrees < 0:
+            rotation_angle_degrees += 360
+
+        return rotation_angle_degrees / 360 * (2 * math.pi)
 
     @staticmethod
     def calculate_polygon_area(segmentation):
@@ -80,24 +101,26 @@ class LabelConverter:
         if input_type == "grayscale":
             color_to_label = {v: k for k, v in mapping_color.items()}
             binaray_img = cv2.imread(mask, cv2.IMREAD_GRAYSCALE)
-            contours, _ = cv2.findContours(
-                binaray_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
-            )
-            for contour in contours:
-                epsilon = epsilon_factor * cv2.arcLength(contour, True)
-                approx = cv2.approxPolyDP(contour, epsilon, True)
-                if len(approx) < 5:
-                    continue
-                x, y, w, h = cv2.boundingRect(contour)
-                center = (int(x + w / 2), int(y + h / 2))
-                color_value = binaray_img[center[1], center[0]]
+            # use the different color_value to find the sub-region for each class
+            for color_value in np.unique(binaray_img):
                 class_name = color_to_label.get(color_value, "Unknown")
-                points = []
-                for point in approx:
-                    x, y = point[0].tolist()
-                    points.append([x, y])
-                result_item = {"points": points, "label": class_name}
-                results.append(result_item)
+                label_map = (binaray_img == color_value).astype(np.uint8)
+
+                contours, _ = cv2.findContours(
+                    label_map, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+                )
+                for contour in contours:
+                    epsilon = epsilon_factor * cv2.arcLength(contour, True)
+                    approx = cv2.approxPolyDP(contour, epsilon, True)
+                    if len(approx) < 5:
+                        continue
+
+                    points = []
+                    for point in approx:
+                        x, y = point[0].tolist()
+                        points.append([x, y])
+                    result_item = {"points": points, "label": class_name}
+                    results.append(result_item)
         elif input_type == "rgb":
             color_to_label = {
                 tuple(color): label for label, color in mapping_color.items()
@@ -111,7 +134,6 @@ class LabelConverter:
             contours, _ = cv2.findContours(
                 binary_img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
             )
-            # print(f"contours: {contours}")
             for contour in contours:
                 epsilon = epsilon_factor * cv2.arcLength(contour, True)
                 approx = cv2.approxPolyDP(contour, epsilon, True)
@@ -154,6 +176,82 @@ class LabelConverter:
             "annotations": [],
         }
         return coco_data
+
+    def calculate_normalized_bbox(self, poly, img_w, img_h):
+        """
+        Calculate the minimum bounding box for a set of four points and return the YOLO format rectangle representation (normalized).
+
+        Args:
+        - poly (list): List of four points [(x1, y1), (x2, y2), (x3, y3), (x4, y4)].
+        - img_w (int): Width of the corresponding image.
+        - img_h (int): Height of the corresponding image.
+
+        Returns:
+        - tuple: Tuple representing the YOLO format rectangle in xywh_center form (all normalized).
+        """
+        xmin, ymin, xmax, ymax = self.calculate_bounding_box(poly)
+        x_center = (xmin + xmax) / (2 * img_w)
+        y_center = (ymin + ymax) / (2 * img_h)
+        width = (xmax - xmin) / img_w
+        height = (ymax - ymin) / img_h
+        return x_center, y_center, width, height
+
+    @staticmethod
+    def calculate_bounding_box(poly):
+        """
+        Calculate the minimum bounding box for a set of four points.
+
+        Args:
+        - poly (list): List of four points [(x1, y1), (x2, y2), (x3, y3), (x4, y4)].
+
+        Returns:
+        - tuple: Tuple representing the bounding box (xmin, ymin, xmax, ymax).
+        """
+        x_vals, y_vals = zip(*poly)
+        return min(x_vals), min(y_vals), max(x_vals), max(y_vals)
+
+    def yolo_obb_to_custom(self, input_file, output_file, image_file):
+        self.reset()
+        with open(input_file, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        img_w, img_h = self.get_image_size(image_file)
+        for line in lines:
+            line = line.strip().split(" ")
+            class_index = int(line[0])
+            label = self.classes[class_index]
+            shape_type = "rotation"
+            # Extracting coordinates from YOLO format
+            x0, y0, x1, y1, x2, y2, x3, y3 = map(float, line[1:])
+            # Rescaling coordinates to image size
+            x0, y0, x1, y1, x2, y2, x3, y3 = (
+                x0 * img_w,
+                y0 * img_h,
+                x1 * img_w,
+                y1 * img_h,
+                x2 * img_w,
+                y2 * img_h,
+                x3 * img_w,
+                y3 * img_h,
+            )
+            # Creating points in the custom format
+            points = [[x0, y0], [x1, y1], [x2, y2], [x3, y3]]
+            shape = {
+                "label": label,
+                "shape_type": shape_type,
+                "flags": {},
+                "points": points,
+                "group_id": None,
+                "description": None,
+                "difficult": False,
+                "direction": self.calculate_rotation_theta(points),
+                "attributes": {},
+            }
+            self.custom_data["shapes"].append(shape)
+        self.custom_data["imagePath"] = osp.basename(image_file)
+        self.custom_data["imageHeight"] = img_h
+        self.custom_data["imageWidth"] = img_w
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(self.custom_data, f, indent=2, ensure_ascii=False)
 
     def yolo_to_custom(self, input_file, output_file, image_file):
         self.reset()
@@ -205,17 +303,16 @@ class LabelConverter:
         with open(output_file, "w", encoding="utf-8") as f:
             json.dump(self.custom_data, f, indent=2, ensure_ascii=False)
 
-    def voc_to_custom(self, input_file, output_file):
+    def voc_to_custom(self, input_file, output_file, image_filename):
         self.reset()
 
         tree = ET.parse(input_file)
         root = tree.getroot()
 
-        image_path = root.find("filename").text
         image_width = int(root.find("size/width").text)
         image_height = int(root.find("size/height").text)
 
-        self.custom_data["imagePath"] = image_path
+        self.custom_data["imagePath"] = image_filename
         self.custom_data["imageHeight"] = image_height
         self.custom_data["imageWidth"] = image_width
 
@@ -328,13 +425,14 @@ class LabelConverter:
             line = line.strip().split(" ")
             x0, y0, x1, y1, x2, y2, x3, y3 = [float(i) for i in line[:8]]
             difficult = line[-1]
+            points = [[x0, y0], [x1, y1], [x2, y2], [x3, y3]]
             shape = {
                 "label": line[8],
                 "description": None,
-                "points": [[x0, y0], [x1, y1], [x2, y2], [x3, y3]],
+                "points": points,
                 "group_id": None,
                 "difficult": bool(int(difficult)),
-                "direction": 0,
+                "direction": self.calculate_rotation_theta(points),
                 "shape_type": "rotation",
                 "flags": {},
             }
@@ -488,6 +586,20 @@ class LabelConverter:
                         )
                         + "\n"
                     )
+                elif shape_type == "rotation":
+                    label = shape["label"]
+                    points = list(chain.from_iterable(shape["points"]))
+                    normalized_coords = [
+                        points[i] / image_width
+                        if i % 2 == 0
+                        else points[i] / image_height
+                        for i in range(8)
+                    ]
+                    x0, y0, x1, y1, x2, y2, x3, y3 = normalized_coords
+                    class_index = self.classes.index(label)
+                    f.write(
+                        f"{class_index} {x0} {y0} {x1} {y1} {x2} {y2} {x3} {y3}\n"
+                    )
 
     def custom_to_voc(self, input_file, output_dir):
         with open(input_file, "r", encoding="utf-8") as f:
@@ -517,10 +629,7 @@ class LabelConverter:
                     "Please update your code to accommodate the new four-point mode."
                 )
                 points = rectangle_from_diagonal(points)
-            xmin = str(points[0][0])
-            ymin = str(points[0][1])
-            xmax = str(points[2][0])
-            ymax = str(points[2][1])
+            xmin, ymin, xmax, ymax = self.calculate_bounding_box(points)
 
             object_elem = ET.SubElement(root, "object")
             ET.SubElement(object_elem, "name").text = label
@@ -528,10 +637,10 @@ class LabelConverter:
             ET.SubElement(object_elem, "truncated").text = "0"
             ET.SubElement(object_elem, "difficult").text = str(int(difficult))
             bndbox = ET.SubElement(object_elem, "bndbox")
-            ET.SubElement(bndbox, "xmin").text = xmin
-            ET.SubElement(bndbox, "ymin").text = ymin
-            ET.SubElement(bndbox, "xmax").text = xmax
-            ET.SubElement(bndbox, "ymax").text = ymax
+            ET.SubElement(bndbox, "xmin").text = str(int(xmin))
+            ET.SubElement(bndbox, "ymin").text = str(int(ymin))
+            ET.SubElement(bndbox, "xmax").text = str(int(xmax))
+            ET.SubElement(bndbox, "ymax").text = str(int(ymax))
 
         xml_string = ET.tostring(root, encoding="utf-8")
         dom = minidom.parseString(xml_string)
@@ -624,8 +733,11 @@ class LabelConverter:
             data = json.load(f)
         with open(output_file, "w", encoding="utf-8") as f:
             for shape in data["shapes"]:
-                label = shape["label"]
                 points = shape["points"]
+                shape_type = shape["shape_type"]
+                if shape_type != "rotation" or len(points) != 4:
+                    continue
+                label = shape["label"]
                 difficult = shape.get("difficult", False)
                 x0 = points[0][0]
                 y0 = points[0][1]
@@ -680,7 +792,7 @@ class LabelConverter:
                 else:
                     mask_mapped = mask
                 binary_mask += mask_mapped
-            cv2.imwrite(output_file, binary_mask)
+            cv2.imencode(".png", binary_mask)[1].tofile(output_file)
         elif output_format == "rgb" and polygons:
             # Initialize rgb_mask
             color_mask = np.zeros(
@@ -703,9 +815,9 @@ class LabelConverter:
                     color_mask = cv2.addWeighted(
                         color_mask, 1, mask_mapped, 1, 0
                     )
-            cv2.imwrite(
-                output_file, cv2.cvtColor(color_mask, cv2.COLOR_BGR2RGB)
-            )
+            cv2.imencode(".png", cv2.cvtColor(color_mask, cv2.COLOR_BGR2RGB))[
+                1
+            ].tofile(output_file)
 
     def custom_to_mot(self, input_path, output_file):
         mot_data = []

@@ -4,6 +4,7 @@
         <file>images/minus.png</file>
         <file>images/plus.png</file>
         <file>images/cancel.png</file>
+        <file>images/convert.png</file>
         <file>images/edit.png</file>
         <file>images/next.png</file>
         <file>images/open.png</file>
@@ -17,7 +18,9 @@
         <file>images/color.png</file>
         <file>images/contact.png</file>
         <file>images/copy.png</file>
+        <file>images/crop.png</file>
         <file>images/delete.png</file>
+        <file>images/hidden.png</file>
         <file>images/done.png</file>
         <file>images/eye.png</file>
         <file>images/file.png</file>
@@ -50,7 +53,9 @@
         <file>images/rotation.png</file>
         <file>images/save-as.png</file>
         <file>images/scissors.png</file>
+        <file>images/docs.png</file>
         <file>images/undo-cross.png</file>
+        <file>images/update.png</file>
         <file>images/undo.png</file>
         <file>images/upload_brain.png</file>
         <file>images/us.png</file>

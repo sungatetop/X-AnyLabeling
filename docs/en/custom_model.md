@@ -2,14 +2,14 @@
 
 Currently, the built-in models in `X-AnyLabeling` are hosted on the GitHub release repository. Therefore, if you want to import a model directly from the GUI interface, it is essential to ensure a smooth internet connection; otherwise, you may encounter download failures.
 
-For users who, due to network issues, are unable to download weight files smoothly from the interface, please refer to the [models_zoo.md](./models_zoo.md) to locate the corresponding weight file for the model you wish to load. Follow the step-by-step instructions provided in [#23](https://github.com/CVHub520/X-AnyLabeling/issues/23) for a demonstration.
+For users who, due to network issues, are unable to download weight files smoothly from the interface, please refer to the [model_zoo.md](./model_zoo.md) to locate the corresponding weight file for the model you wish to load. Follow the step-by-step instructions provided in [#23](https://github.com/CVHub520/X-AnyLabeling/issues/23) for a demonstration.
 
 
 ## 2. Loading Custom Models
 
 ### 2.1 Adapted Models
 
-**Adapted Models** refer to network models that have already been adapted within X-AnyLabeling. Similarly, you can refer to the [models_zoo.md](./models_zoo.md) document. Taking the [yolov5s](https://github.com/ultralytics/yolov5) model as an example, assuming a user has trained a custom `yolov5` detection model locally, you can download the corresponding [configuration file](../../anylabeling/configs/auto_labeling/yolov5s.yaml) as shown below:
+**Adapted Models** refer to network models that have already been adapted within X-AnyLabeling. Similarly, you can refer to the [model_zoo.md](./model_zoo.md) document. Taking the [yolov5s](https://github.com/ultralytics/yolov5) model as an example, assuming a user has trained a custom `yolov5` detection model locally, you can download the corresponding [configuration file](../../anylabeling/configs/auto_labeling/yolov5s.yaml) as shown below:
 
 ```YAML
 type: yolov5
@@ -66,7 +66,7 @@ Now, we understand the role of configuration files in the entire `X-AnyLabeling`
 
 > Note: After the transformation, make sure to open the model using [Netron](https://netron.app/) tool to ensure alignment between the input and output nodes of the model and the built-in model within X-AnyLabeling. This step is crucial for compatibility and seamless integration.
 
-Next, copy the configuration file corresponding to the current model from [models_zoo.md](./models_zoo.md) to the local machine and modify the corresponding hyperparameter fields as needed, such as detection threshold and categories. For example:
+Next, copy the configuration file corresponding to the current model from [model_zoo.md](./model_zoo.md) to the local machine and modify the corresponding hyperparameter fields as needed, such as detection threshold and categories. For example:
 
 ```YAML
 type: yolov5
@@ -247,3 +247,29 @@ Refer to this [tutorial](https://github.com/CVHub520/sam-hq).
 - [InternImage](https://github.com/OpenGVLab/InternImage)
 
 InternImage introduces a large-scale convolutional neural network (CNN) model, leveraging deformable convolution as the core operator to achieve a large effective receptive field, adaptive spatial aggregation, and reduced inductive bias, leading to stronger and more robust pattern learning from massive data. It outperforms current CNNs and vision transformers on benchmarks
+
+> Paper: InternImage: Exploring Large-Scale Vision Foundation Models with Deformable Convolutions</br>
+> Affiliation: Shanghai AI Laboratory, Tsinghua University, Nanjing University, etc.</br>
+> Published: CVPR 2023</br>
+
+Refer to this [tutorial](../../tools/export_internimage_model_onnx.py).
+
+- [EdgeSAM](https://github.com/chongzhou96/EdgeSAM)
+
+`EdgeSAM` is an accelerated variant of the Segment Anything Model (SAM), optimized for efficient execution on edge devices with minimal compromise in performance. It achieves a 40-fold speed increase compared to the original SAM, and outperforms MobileSAM, being 14 times as fast when deployed on edge devices while enhancing the mIoUs on COCO and LVIS by 2.3 and 3.2 respectively. EdgeSAM is also the first SAM variant that can run at over 30 FPS on an iPhone 14.
+
+> Paper: Prompt-In-the-Loop Distillation for On-Device Deployment of SAM</br>
+> Affiliation: S-Lab, Nanyang Technological University, Shanghai Artificial Intelligence Laboratory.</br>
+> Published: Arxiv 2023</br>
+
+Refer to this [tutorial](https://github.com/chongzhou96/EdgeSAM/blob/master/scripts/export_onnx_model.py).
+
+- [YOLO-World](https://github.com/AILab-CVC/YOLO-World)
+
+`YOLO-World` enhances the YOLO series by incorporating vision-language modeling, achieving efficient open-scenario object detection with impressive performance on various tasks.
+
+> Paper: Real-Time Open-Vocabulary Object Detection</br>
+> Affiliation: Tencent AI Lab, ARC Lab, Tencent PCG, Huazhong University of Science and Technology.</br>
+> Published: Arxiv 2024</br>
+
+Refer to this [tutorial](../../tools/export_yolow_onnx.py).

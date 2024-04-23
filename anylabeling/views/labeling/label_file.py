@@ -6,6 +6,9 @@ import json
 import os.path as osp
 
 import PIL.Image
+from PIL import ImageFile
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 from ...app_info import __version__
 from . import utils
@@ -29,35 +32,23 @@ class LabelFileError(Exception):
 class LabelFile:
     suffix = ".json"
 
-    def __init__(self, filename=None):
+    def __init__(self, filename=None, image_dir=None):
         self.shapes = []
         self.image_path = None
         self.image_data = None
+        self.image_dir = image_dir
         if filename is not None:
             self.load(filename)
         self.filename = filename
 
     @staticmethod
-    def load_image_file(filename):
+    def load_image_file(filename, default=None):
         try:
-            image_pil = PIL.Image.open(filename)
-        except IOError:
+            with open(filename, "rb") as f:
+                return f.read()
+        except:
             logger.error("Failed opening image file: %s", filename)
-            return None
-
-        # apply orientation to image according to exif
-        image_pil = utils.apply_exif_orientation(image_pil)
-
-        with io.BytesIO() as f:
-            ext = osp.splitext(filename)[1].lower()
-            if ext in [".jpg", ".jpeg"]:
-                image_pil = image_pil.convert("RGB")
-                img_format = "JPEG"
-            else:
-                img_format = "PNG"
-            image_pil.save(f, format=img_format)
-            f.seek(0)
-            return f.read()
+            return default
 
     def load(self, filename):
         keys = [
@@ -102,11 +93,17 @@ class LabelFile:
                             "points"
                         ] = utils.rectangle_from_diagonal(shape_points)
 
+            data["imagePath"] = osp.basename(data["imagePath"])
             if data["imageData"] is not None:
                 image_data = base64.b64decode(data["imageData"])
             else:
                 # relative path from label file to relative path from cwd
-                image_path = osp.join(osp.dirname(filename), data["imagePath"])
+                if self.image_dir:
+                    image_path = osp.join(self.image_dir, data["imagePath"])
+                else:
+                    image_path = osp.join(
+                        osp.dirname(filename), data["imagePath"]
+                    )
                 image_data = self.load_image_file(image_path)
             flags = data.get("flags") or {}
             image_path = data["imagePath"]
@@ -191,6 +188,19 @@ class LabelFile:
             other_data = {}
         if flags is None:
             flags = {}
+        for i, shape in enumerate(shapes):
+            if shape["shape_type"] == "rectangle":
+                sorted_box = LabelConverter.calculate_bounding_box(
+                    shape["points"]
+                )
+                xmin, ymin, xmax, ymax = sorted_box
+                shape["points"] = [
+                    [xmin, ymin],
+                    [xmax, ymin],
+                    [xmax, ymax],
+                    [xmin, ymax],
+                ]
+                shapes[i] = shape
         data = {
             "version": __version__,
             "flags": flags,
